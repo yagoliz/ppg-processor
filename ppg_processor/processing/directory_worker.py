@@ -7,8 +7,8 @@ import pandas as pd
 import neurokit2 as nk
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from processing.filters import bandpass_filter
-from processing.hrv_metrics import calculate_hrv_metrics
+from ppg_processor.processing.filters import bandpass_filter
+from ppg_processor.processing.hrv_metrics import calculate_hrv_metrics
 from ppg_processor.utils.io_utils import read_ppg_file
 
 class DirectoryProcessingWorker(QThread):

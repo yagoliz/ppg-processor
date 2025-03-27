@@ -13,8 +13,8 @@ from PyQt6.QtCore import Qt
 
 import pyqtgraph as pg
 
-from processing.file_worker import PPGProcessingWorker
-from processing.directory_worker import DirectoryProcessingWorker
+from ppg_processor.processing.file_worker import PPGProcessingWorker
+from ppg_processor.processing.directory_worker import DirectoryProcessingWorker
 
 class PPGProcessorApp(QMainWindow):
     """Main application window for the PPG Processor"""

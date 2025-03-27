@@ -5,7 +5,7 @@ PPG Processor - A tool for processing PPG data and calculating PPI and HRV metri
 
 import sys
 from PyQt6.QtWidgets import QApplication
-from gui.app import PPGProcessorApp
+from ppg_processor.gui.app import PPGProcessorApp
 
 def main():
     app = QApplication(sys.argv)
