@@ -1,0 +1,142 @@
+name: Build PPG Processor (Multi-Platform)
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - platform: windows-latest
+            output_name: PPG_Processor.exe
+            asset_name: PPG_Processor_Windows
+            zip_name: PPG_Processor_Windows.zip
+          - platform: macos-latest
+            output_name: PPG_Processor
+            asset_name: PPG_Processor_macOS
+            zip_name: PPG_Processor_macOS.zip
+          - platform: ubuntu-latest
+            output_name: PPG_Processor
+            asset_name: PPG_Processor_Linux
+            zip_name: PPG_Processor_Linux.zip
+
+    runs-on: ${{ matrix.platform }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install UV (Unix)
+        if: matrix.platform != 'windows-latest'
+        run: |
+          curl -sSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.uv/bin" >> $GITHUB_PATH
+
+      - name: Install UV (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          curl -sSf https://astral.sh/uv/install.sh | python -
+          echo "$HOME\.uv\bin" >> $GITHUB_PATH
+
+      - name: Install Linux Dependencies
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xkb1 libxkbcommon-x11-0 libxcb-cursor0
+
+      - name: Install dependencies
+        run: |
+          uv pip install PyQt6 pyqtgraph pandas numpy scipy neurokit2 pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller --name=PPG_Processor \
+            --windowed \
+            --onefile \
+            --hidden-import=neurokit2 \
+            --hidden-import=pandas \
+            --hidden-import=numpy \
+            --hidden-import=scipy.signal \
+            --hidden-import=pyqtgraph \
+            --hidden-import=PyQt6.QtCore \
+            --hidden-import=PyQt6.QtWidgets \
+            --hidden-import=PyQt6.QtGui \
+            ppg_processor/main.py
+        shell: bash
+
+      - name: Create README.txt
+        run: |
+          cat > dist/README.txt << EOF
+          PPG PROCESSOR APPLICATION
+          =========================
+
+          This application processes PPG (Photoplethysmography) data to calculate PPI (Pulse-to-Pulse Interval) and HRV (Heart Rate Variability) metrics.
+
+          INSTALLATION
+          -----------
+          No installation is needed. Simply run the PPG_Processor executable.
+
+          USAGE
+          -----
+          1. Choose an input method:
+             - Single CSV File: Select a single PPG data file
+             - Directory with PPG Files: Select a directory containing subfolders, each with a ppg.csv file
+             
+          2. Click "Browse..." to select your file or directory
+
+          3. Adjust the processing settings as needed:
+             - Window Size: Time window for HRV calculations (in minutes)
+             - Channels: Select which PPG channels to process (P0, P1, P2)
+             - PPI Thresholds: Set minimum and maximum valid PPI values
+
+          4. Click "Process" to analyze the data
+
+          5. Review the results in the tabs
+
+          6. Click "Save Results" to save the processed data
+          EOF
+        shell: bash
+
+      - name: Archive executable
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.asset_name }}
+          path: |
+            dist/${{ matrix.output_name }}
+            dist/README.txt
+
+      - name: Create release archive (Unix)
+        if: startsWith(github.ref, 'refs/tags/') && matrix.platform != 'windows-latest'
+        run: |
+          cd dist
+          zip -r ../${{ matrix.zip_name }} ${{ matrix.output_name }} README.txt
+        shell: bash
+
+      - name: Create release archive (Windows)
+        if: startsWith(github.ref, 'refs/tags/') && matrix.platform == 'windows-latest'
+        run: |
+          Compress-Archive -Path dist\${{ matrix.output_name }}, dist\README.txt -DestinationPath ${{ matrix.zip_name }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ${{ matrix.zip_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
