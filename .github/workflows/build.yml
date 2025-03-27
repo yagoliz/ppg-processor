@@ -48,8 +48,8 @@ jobs:
       - name: Install UV (Windows)
         if: matrix.platform == 'windows-latest'
         run: |
-          curl -sSf https://astral.sh/uv/install.sh | python -
-          echo "$HOME\.uv\bin" >> $GITHUB_PATH
+          powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+          echo "$HOME/.uv/bin" >> $GITHUB_PATH
 
       - name: Install Linux Dependencies
         if: matrix.platform == 'ubuntu-latest'
