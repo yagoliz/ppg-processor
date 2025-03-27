@@ -31,7 +31,7 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --name=PPG_Processor `
+          uv run pyinstaller --name=PPG_Processor `
             --windowed `
             --onefile `
             --hidden-import=neurokit2 `

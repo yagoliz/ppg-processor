@@ -395,7 +395,7 @@ wheels = [
 
 [[package]]
 name = "ppg-processor"
-version = "1.0.0"
+version = "1.0.3"
 source = { editable = "." }
 dependencies = [
     { name = "neurokit2" },
