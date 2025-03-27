@@ -42,7 +42,7 @@ jobs:
       - name: Install UV (Unix)
         if: matrix.platform != 'windows-latest'
         run: |
-          curl -sSf https://astral.sh/uv/install.sh | sh
+          curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.uv/bin" >> $GITHUB_PATH
 
       - name: Install UV (Windows)
@@ -57,7 +57,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xkb1 libxkbcommon-x11-0 libxcb-cursor0
 
-      - name: Install dependencies
+      - name: Install dependencies (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          uv pip install --system PyQt6 pyqtgraph pandas numpy scipy neurokit2 pyinstaller
+
+      - name: Install dependencies (Unix)
+        if: matrix.platform != 'windows-latest'
         run: |
           uv pip install PyQt6 pyqtgraph pandas numpy scipy neurokit2 pyinstaller
 
