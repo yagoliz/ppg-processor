@@ -3,13 +3,14 @@ Main application window for the PPG Processor
 """
 
 import os
+import pandas as pd
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QFileDialog, QComboBox, QCheckBox, 
     QSpinBox, QGroupBox, QProgressBar, QTabWidget, QMessageBox, 
-    QStatusBar, QGridLayout, QRadioButton
+    QStatusBar, QGridLayout, QRadioButton, QTimeEdit
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTime
 
 import pyqtgraph as pg
 
@@ -23,7 +24,7 @@ class PPGProcessorApp(QMainWindow):
         super().__init__()
         
         self.setWindowTitle("PPG to PPI Processor")
-        self.setGeometry(100, 100, 1000, 700)
+        self.setGeometry(100, 100, 1000, 1000)
         
         self.init_ui()
         
@@ -141,12 +142,15 @@ class PPGProcessorApp(QMainWindow):
         settings_layout = QGridLayout()
         
         # Window size setting
+        settings_layout.addWidget(QLabel("Window Size:"), 0, 0)
         self.window_size_spin = QSpinBox()
         self.window_size_spin.setRange(1, 60)
         self.window_size_spin.setValue(5)
         self.window_size_spin.setSuffix(" min")
+        settings_layout.addWidget(self.window_size_spin, 0, 1)
         
         # Channel selection
+        settings_layout.addWidget(QLabel("Channels:"), 1, 0)
         self.channel_p0_check = QCheckBox("P0")
         self.channel_p0_check.setChecked(True)
         self.channel_p1_check = QCheckBox("P1")
@@ -154,50 +158,46 @@ class PPGProcessorApp(QMainWindow):
         self.channel_p2_check = QCheckBox("P2")
         self.channel_p2_check.setChecked(True)
         
-        # Output format selection
-        self.output_format_combo = QComboBox()
-        self.output_format_combo.addItem("CSV")
-        
-        # HRV calculation option
-        self.calculate_hrv_check = QCheckBox("Calculate HRV Metrics")
-        self.calculate_hrv_check.setChecked(True)
-        
-        # PPI threshold settings for outlier removal
-        self.ppi_low_threshold_spin = QSpinBox()
-        self.ppi_low_threshold_spin.setRange(300, 1000)
-        self.ppi_low_threshold_spin.setValue(667)
-        self.ppi_low_threshold_spin.setSuffix(" ms")
-        
-        self.ppi_high_threshold_spin = QSpinBox()
-        self.ppi_high_threshold_spin.setRange(1000, 3000)
-        self.ppi_high_threshold_spin.setValue(2000)
-        self.ppi_high_threshold_spin.setSuffix(" ms")
-        
-        settings_layout.addWidget(QLabel("Window Size:"), 0, 0)
-        settings_layout.addWidget(self.window_size_spin, 0, 1)
-        
-        settings_layout.addWidget(QLabel("Channels:"), 1, 0)
         channel_layout = QHBoxLayout()
         channel_layout.addWidget(self.channel_p0_check)
         channel_layout.addWidget(self.channel_p1_check)
         channel_layout.addWidget(self.channel_p2_check)
         settings_layout.addLayout(channel_layout, 1, 1)
         
+        # Output format selection
         settings_layout.addWidget(QLabel("Output Format:"), 2, 0)
+        self.output_format_combo = QComboBox()
+        self.output_format_combo.addItem("CSV")
         settings_layout.addWidget(self.output_format_combo, 2, 1)
         
+        # HRV calculation option
+        self.calculate_hrv_check = QCheckBox("Calculate HRV Metrics")
+        self.calculate_hrv_check.setChecked(True)
         settings_layout.addWidget(self.calculate_hrv_check, 3, 0, 1, 2)
+        
+        # Add time range UI
+        time_range_group = self.init_time_range_ui()
+        settings_layout.addWidget(time_range_group, 4, 0, 1, 2)
         
         # PPI threshold settings
         threshold_group = QGroupBox("PPI Thresholds (outlier removal)")
         threshold_layout = QGridLayout()
         threshold_layout.addWidget(QLabel("Min:"), 0, 0)
+        self.ppi_low_threshold_spin = QSpinBox()
+        self.ppi_low_threshold_spin.setRange(300, 1000)
+        self.ppi_low_threshold_spin.setValue(667)
+        self.ppi_low_threshold_spin.setSuffix(" ms")
         threshold_layout.addWidget(self.ppi_low_threshold_spin, 0, 1)
+        
         threshold_layout.addWidget(QLabel("Max:"), 1, 0)
+        self.ppi_high_threshold_spin = QSpinBox()
+        self.ppi_high_threshold_spin.setRange(1000, 3000)
+        self.ppi_high_threshold_spin.setValue(2000)
+        self.ppi_high_threshold_spin.setSuffix(" ms")
         threshold_layout.addWidget(self.ppi_high_threshold_spin, 1, 1)
         threshold_group.setLayout(threshold_layout)
         
-        settings_layout.addWidget(threshold_group, 4, 0, 1, 2)
+        settings_layout.addWidget(threshold_group, 5, 0, 1, 2)
         
         settings_group.setLayout(settings_layout)
         return settings_group
@@ -215,6 +215,41 @@ class PPGProcessorApp(QMainWindow):
         self.file_path_label.setText("No file selected")
         self.dir_path_label.setText("No directory selected")
         self.process_btn.setEnabled(False)
+
+    def init_time_range_ui(self):
+        """Create the time range selection UI components"""
+        time_range_group = QGroupBox("Time Range Filter")
+        time_range_layout = QGridLayout()
+        
+        # Checkbox to enable/disable time range filtering
+        self.use_time_range_check = QCheckBox("Filter by Time Range")
+        self.use_time_range_check.toggled.connect(self.toggle_time_range)
+        
+        # Time editors for start and end times
+        time_range_layout.addWidget(QLabel("Start Time:"), 1, 0)
+        self.start_time_edit = QTimeEdit()
+        self.start_time_edit.setDisplayFormat("HH:mm")
+        self.start_time_edit.setTime(QTime(0, 0))  # Default 00:00
+        self.start_time_edit.setEnabled(False)
+        time_range_layout.addWidget(self.start_time_edit, 1, 1)
+        
+        time_range_layout.addWidget(QLabel("End Time:"), 2, 0)
+        self.end_time_edit = QTimeEdit()
+        self.end_time_edit.setDisplayFormat("HH:mm")
+        self.end_time_edit.setTime(QTime(4, 59))  # Default 04:59
+        self.end_time_edit.setEnabled(False)
+        time_range_layout.addWidget(self.end_time_edit, 2, 1)
+        
+        self.use_time_range_check.setChecked(True)
+        time_range_layout.addWidget(self.use_time_range_check, 0, 0, 1, 2)
+        time_range_group.setLayout(time_range_layout)
+    
+        return time_range_group
+
+    def toggle_time_range(self, checked):
+        """Enable or disable time range selection"""
+        self.start_time_edit.setEnabled(checked)
+        self.end_time_edit.setEnabled(checked)
     
     def browse_file(self):
         """Browse for a single CSV file"""
@@ -275,7 +310,10 @@ class PPGProcessorApp(QMainWindow):
                 channels=channels,
                 calculate_hrv=self.calculate_hrv_check.isChecked(),
                 ppi_low_threshold=self.ppi_low_threshold_spin.value(),
-                ppi_high_threshold=self.ppi_high_threshold_spin.value()
+                ppi_high_threshold=self.ppi_high_threshold_spin.value(),
+                use_time_range=self.use_time_range_check.isChecked(),
+                start_time=self.start_time_edit.time().toString("HH:mm") if self.use_time_range_check.isChecked() else None,
+                end_time=self.end_time_edit.time().toString("HH:mm") if self.use_time_range_check.isChecked() else None
             )
         elif not is_file_mode and self.current_directory:
             self.worker = DirectoryProcessingWorker(
@@ -284,7 +322,10 @@ class PPGProcessorApp(QMainWindow):
                 channels=channels,
                 calculate_hrv=self.calculate_hrv_check.isChecked(),
                 ppi_low_threshold=self.ppi_low_threshold_spin.value(),
-                ppi_high_threshold=self.ppi_high_threshold_spin.value()
+                ppi_high_threshold=self.ppi_high_threshold_spin.value(),
+                use_time_range=self.use_time_range_check.isChecked(),
+                start_time=self.start_time_edit.time().toString("HH:mm") if self.use_time_range_check.isChecked() else None,
+                end_time=self.end_time_edit.time().toString("HH:mm") if self.use_time_range_check.isChecked() else None
             )
         else:
             QMessageBox.warning(self, "No Input", "Please select a file or directory to process.")
@@ -381,11 +422,22 @@ class PPGProcessorApp(QMainWindow):
                 hrv_layout = QVBoxLayout()
                 
                 # Add HRV metrics summary
-                hrv_summary = f"Windows analyzed: {len(hrv_metrics)}\n"
-                if not hrv_metrics.empty:
-                    hrv_summary += f"Average SDNN: {hrv_metrics['SDNN'].mean():.2f} ms\n"
-                    hrv_summary += f"Average RMSSD: {hrv_metrics['RMSSD'].mean():.2f} ms\n"
-                    hrv_summary += f"Average HR: {60000 / hrv_metrics['MeanNN'].mean():.1f} bpm\n"
+    # Add HRV metrics summary (using overall metrics if available)
+                overall_metrics = result_dict.get('overall_metrics')
+                if overall_metrics is not None:
+                    hrv_summary = "Overall HRV Metrics:\n"
+                    hrv_summary += f"SDNN: {overall_metrics['SDNN']:.2f} ms\n"
+                    hrv_summary += f"RMSSD: {overall_metrics['RMSSD']:.2f} ms\n"
+                    hrv_summary += f"Mean HR: {60000 / overall_metrics['MeanNN']:.1f} bpm\n"
+                    if 'Time_Range' in overall_metrics:
+                        hrv_summary += f"Time Range: {overall_metrics['Time_Range']}\n"
+
+                else:
+                    hrv_summary = f"Windows analyzed: {len(hrv_metrics)}\n"
+                    if not hrv_metrics.empty:
+                        hrv_summary += f"Average SDNN: {hrv_metrics['SDNN'].mean():.2f} ms\n"
+                        hrv_summary += f"Average RMSSD: {hrv_metrics['RMSSD'].mean():.2f} ms\n"
+                        hrv_summary += f"Average HR: {60000 / hrv_metrics['MeanNN'].mean():.1f} bpm\n"
                 
                 hrv_summary_label = QLabel(hrv_summary)
                 hrv_layout.addWidget(hrv_summary_label)
@@ -442,6 +494,7 @@ class PPGProcessorApp(QMainWindow):
             for channel, result_dict in self.results.items():
                 ppi_data = result_dict['ppi_data']
                 hrv_metrics = result_dict['hrv_metrics']
+                overall_metrics = result_dict.get('overall_metrics')
                 
                 if ppi_data.empty:
                     continue
@@ -450,10 +503,25 @@ class PPGProcessorApp(QMainWindow):
                 csv_path = os.path.join(save_dir, f"{base_filename}_{channel}_ppi.csv")
                 ppi_data.to_csv(csv_path, index=False)
                 
-                # Save HRV metrics if available
+                # Save HRV metrics if available (both per-window and overall)
                 if hrv_metrics is not None and not hrv_metrics.empty:
                     hrv_csv_path = os.path.join(save_dir, f"{base_filename}_{channel}_hrv.csv")
-                    hrv_metrics.to_csv(hrv_csv_path, index=False)
+                    
+                    # If overall metrics exist, add them as a special row
+                    if overall_metrics is not None:
+                        # Convert overall metrics dict to DataFrame row
+                        overall_df = pd.DataFrame([overall_metrics])
+                        overall_df['Window'] = 'Overall'  # Add identifier column
+                        
+                        # Add window column to hrv_metrics if it doesn't exist
+                        if 'Window' not in hrv_metrics.columns:
+                            hrv_metrics['Window'] = [f"Window_{i}" for i in range(len(hrv_metrics))]
+                        
+                        # Combine per-window and overall metrics
+                        combined_metrics = pd.concat([hrv_metrics, overall_df], ignore_index=True)
+                        combined_metrics.to_csv(hrv_csv_path, index=False)
+                    else:
+                        hrv_metrics.to_csv(hrv_csv_path, index=False)
             
             QMessageBox.information(self, "Success", f"Results saved to {save_dir}")
             self.status_bar.showMessage(f"Results saved to {save_dir}")

@@ -2,6 +2,8 @@
 Worker class for processing a single PPG file
 """
 
+import datetime
+
 import pandas as pd
 import neurokit2 as nk
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -18,9 +20,19 @@ class PPGProcessingWorker(QThread):
     status = pyqtSignal(str)
     error = pyqtSignal(str)
     finished_with_result = pyqtSignal(dict)
-    
-    def __init__(self, file_path, window_size=5, channels=None, calculate_hrv=True, 
-                 ppi_low_threshold=667, ppi_high_threshold=2000):
+
+    def __init__(
+        self,
+        file_path,
+        window_size=5,
+        channels=None,
+        calculate_hrv=True,
+        ppi_low_threshold=667,
+        ppi_high_threshold=2000,
+        use_time_range=False,
+        start_time=None,
+        end_time=None,
+    ):
         super().__init__()
         self.file_path = file_path
         self.window_size = window_size
@@ -28,6 +40,9 @@ class PPGProcessingWorker(QThread):
         self.calculate_hrv = calculate_hrv
         self.ppi_low_threshold = ppi_low_threshold
         self.ppi_high_threshold = ppi_high_threshold
+        self.use_time_range = use_time_range
+        self.start_time = start_time
+        self.end_time = end_time
         
     def run(self):
         try:          
@@ -41,6 +56,22 @@ class PPGProcessingWorker(QThread):
             # Set datetime as index if it's not already
             if 'datetime' in ppg.columns:
                 ppg.set_index('datetime', inplace=True)
+
+            # If time range is enabled, filter the data
+            if self.use_time_range and self.start_time and self.end_time:
+                # Convert string times to datetime.time objects
+                start_time = datetime.datetime.strptime(self.start_time, "%H:%M").time()
+                end_time = datetime.datetime.strptime(self.end_time, "%H:%M").time()
+
+                # Filter based on time of day
+                ppg = ppg[
+                    (ppg.index.time >= start_time) & (ppg.index.time <= end_time)
+                ]
+
+                # If PPG is empty after filtering, emit error
+                if ppg.empty:
+                    self.error.emit(f"No data points in selected time range: {self.start_time}-{self.end_time}")
+                    return
             
             if ppg.empty:
                 self.error.emit("No data found in the file.")
@@ -165,22 +196,32 @@ class PPGProcessingWorker(QThread):
                 
                 # Calculate HRV metrics if requested
                 hrv_metrics = None
+                overall_metrics = None
                 if self.calculate_hrv and 'PPI' in cleaned_results.columns and not cleaned_results.empty:
                     self.status.emit(f"Calculating HRV metrics for channel {channel}...")
                     try:
-                        # Use the provided functions to calculate HRV metrics
+                        # Calculate per-window HRV metrics
                         hrv_metrics = calculate_hrv_metrics(
                             cleaned_results[['Time', 'PPI', 'Quality']], 
                             window=self.window_size
                         )
+                        
+                        # Calculate overall HRV metrics
+                        overall_metrics = hrv_metrics.mean()
+                        
+                        # Add time range info to overall metrics if used
+                        if self.use_time_range:
+                            overall_metrics["Time_Range"] = f"{self.start_time}-{self.end_time}"
+                            
                         self.status.emit(f"Calculated HRV metrics for {len(hrv_metrics)} windows")
                     except Exception as e:
                         self.status.emit(f"Error calculating HRV metrics: {str(e)}")
-                
-                # Store both PPI and HRV data
+
+                # Store both PPI, per-window HRV, and overall metrics data
                 results[channel] = {
                     'ppi_data': cleaned_results,
-                    'hrv_metrics': hrv_metrics
+                    'hrv_metrics': hrv_metrics,
+                    'overall_metrics': overall_metrics
                 }
                 
             self.finished_with_result.emit(results)
