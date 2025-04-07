@@ -35,7 +35,7 @@ jobs:
             --windowed `
             --onefile `
             --icon=ppg_processor/assets/icon-512-maskable.png `
-            --add-data=ppg_processor/assets;assets
+            --add-data=ppg_processor/assets;assets `
             --hidden-import=neurokit2 `
             --hidden-import=pandas `
             --hidden-import=numpy `
