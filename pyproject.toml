@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ppg_processor"
-version = "1.0.1"
+version = "1.0.2"
 description = "A tool for processing PPG data and calculating PPI and HRV metrics"
 readme = "README.md"
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "Yago Lizarribar Carrilll", email = "yago.lizarribar@gmail.com"}
 ]
 license = {text = "MIT"}
 classifiers = [
@@ -36,4 +36,35 @@ packages = ["ppg_processor"]
 [dependency-groups]
 dev = [
     "pyinstaller>=6.12.0",
+    "ruff>=0.11.4",
 ]
+
+[tool.ruff]        
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    "__init__.py",
+]
+
+line-length = 120
+indent-width = 4
+target-version = "py311"
+
+[tool.ruff.lint]
+fixable = ["ALL"]
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+
+# Like Black, use double quotes for strings.
+quote-style = "double"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"

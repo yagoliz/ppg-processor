@@ -26,6 +26,25 @@ def ensure_uv_installed():
             print("Please install UV manually: https://github.com/astral-sh/uv#installation")
             sys.exit(1)
 
+def ensure_directories():
+    """Ensure the resources and assets directories exist"""
+    # Define directory paths
+    assets_dir = os.path.join("ppg_processor", "assets")
+    
+    # Create directories if they don't exist
+    os.makedirs(assets_dir, exist_ok=True)
+    
+    # Create __init__.py files if they don't exist
+    assets_init = os.path.join(assets_dir, "__init__.py")
+    
+    if not os.path.exists(assets_init):
+        with open(assets_init, "w") as f:
+            f.write('"""\nAsset files for the PPG Processor\n"""\n')
+    
+    print("Directory structure created successfully.")
+    
+    return assets_dir
+
 def install_dependencies():
     """Install dependencies using UV"""
     print("Installing dependencies with UV...")
@@ -59,20 +78,20 @@ def build_executable():
     # Clean previous builds
     if os.path.exists('dist'):
         shutil.rmtree('dist')
-    
+
+    # Set icon path
+    icon_path = os.path.abspath('ppg_processor/assets/icon-512-maskable.png')
+
     # Generate spec file
     print("Generating PyInstaller spec file...")
     spec_command = [
         'pyinstaller',
-        '--name=PPG_Processor',
+        '--name=PPG Processor',
         '--windowed',  # No console window
         '--onefile',   # Single executable file
+        f'--icon={icon_path}',
         'ppg_processor/main.py'
     ]
-    
-    # Add icon if available
-    if os.path.exists('icon.ico'):
-        spec_command.append('--icon=icon.ico')
     
     subprocess.run(spec_command, check=True)
     
@@ -108,7 +127,7 @@ def build_executable():
     subprocess.run(['pyinstaller', 'PPG_Processor.spec'], check=True)
     
     print("\nPackaging complete!")
-    print(f"Executable is located at: {os.path.abspath('dist/PPG_Processor.exe')}")
+    print(f"Executable is located at: {os.path.abspath('dist/')}")
 
 def create_virtual_environment():
     """Create a virtual environment using UV"""
