@@ -4,6 +4,7 @@ Build script for PPG Processor using UV instead of setuptools
 """
 
 import os
+import platform
 import sys
 import subprocess
 import shutil
@@ -26,6 +27,7 @@ def ensure_uv_installed():
             print("Please install UV manually: https://github.com/astral-sh/uv#installation")
             sys.exit(1)
 
+
 def ensure_directories():
     """Ensure the resources and assets directories exist"""
     # Define directory paths
@@ -45,6 +47,7 @@ def ensure_directories():
     
     return assets_dir
 
+
 def install_dependencies():
     """Install dependencies using UV"""
     print("Installing dependencies with UV...")
@@ -55,6 +58,7 @@ def install_dependencies():
         "numpy",
         "scipy",
         "neurokit2",
+        "pywavelets",
         "pyinstaller"
     ]
     
@@ -66,6 +70,7 @@ def install_dependencies():
     # Install dependencies
     subprocess.run(["uv", "pip", "install", "-r", "requirements.txt"], check=True)
     print("Dependencies installed successfully.")
+
 
 def build_executable():
     """Build executable using PyInstaller"""
@@ -82,20 +87,32 @@ def build_executable():
     # Set icon path
     icon_path = os.path.abspath('ppg_processor/assets/icon-512-maskable.png')
 
+    # MacOS specific options
+    onefile_option = '--onefile'  # Default to onefile for all platforms
+    if platform.system() == 'Darwin':
+        onefile_option = '--onedir'
+
     # Generate spec file
     print("Generating PyInstaller spec file...")
     spec_command = [
         'pyinstaller',
-        '--name=PPG Processor',
-        '--windowed',  # No console window
-        '--onefile',   # Single executable file
+        '--name=PPG_Processor',
+        '--windowed',
+        "--clean",
+        f'{onefile_option}',
+        '--collect-submodules=scipy',
+        '--collect-submodules=numpy',
+        '--collect-submodules=pandas',
+        '--collect-submodules=neurokit2',
+        '--collect-submodules=PyQt6',
+        '--collect-submodules=pyqtgraph',
         f'--icon={icon_path}',
         'ppg_processor/main.py'
     ]
     
     subprocess.run(spec_command, check=True)
     
-    # Modify the spec file to include hidden imports
+    # Modify the spec file to include hidden imports and fix issues
     print("Modifying spec file to include required packages...")
     with open('PPG_Processor.spec', 'r') as file:
         spec_content = file.read()
@@ -105,11 +122,20 @@ def build_executable():
         'neurokit2',
         'pandas',
         'numpy',
+        'pywavelets',
         'scipy.signal',
+        'scipy.stats',
+        'scipy.interpolate',
         'pyqtgraph',
         'PyQt6.QtCore',
         'PyQt6.QtWidgets',
-        'PyQt6.QtGui'
+        'PyQt6.QtGui',
+        'PyQt6.QtOpenGL',
+        'PyQt6.QtOpenGLWidgets',
+        'sklearn.utils._cython_blas',
+        'sklearn.neighbors.typedefs',
+        'sklearn.neighbors.quad_tree',
+        'sklearn.tree._utils',
     ]
     
     # Insert hidden imports into the spec file
@@ -129,6 +155,7 @@ def build_executable():
     print("\nPackaging complete!")
     print(f"Executable is located at: {os.path.abspath('dist/')}")
 
+
 def create_virtual_environment():
     """Create a virtual environment using UV"""
     print("Creating a virtual environment with UV...")
@@ -143,10 +170,37 @@ def create_virtual_environment():
     else:  # Unix/Linux/Mac
         print("    source .venv/bin/activate")
 
+
+def create_dmg():
+    """Create a DMG installer for macOS"""
+    print("Creating DMG installer for macOS...")
+    try:
+        subprocess.run(["create-dmg",
+                        "--volname", "PPG Processor",
+                        "--volicon", "ppg_processor/assets/icon-512-maskable.icns",
+                        "--window-pos", "200", "120",
+                        "--window-size", "800", "400",
+                        "--icon-size", "100",
+                        "--icon", "PPG_Processor.app", "200", "190",
+                        "--hide-extension", "PPG_Processor.app",
+                        "--app-drop-link", "600", "185",
+                        "PPG_Processor-Installer.dmg",
+                        "dist/PPG_Processor.app"],
+                        check=True)
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error creating DMG: {e}")
+        print("Please ensure 'create-dmg' is installed and available in your PATH.")
+        sys.exit(1)
+
+
 def main():
     """Main function to build the application"""
     # Ensure UV is installed
     ensure_uv_installed()
+    
+    # Ensure directories exist
+    ensure_directories()
     
     # Create a virtual environment
     create_virtual_environment()
@@ -156,6 +210,10 @@ def main():
     
     # Build executable
     build_executable()
+
+    # Create dmg if macos
+    if platform.system() == 'Darwin':
+        create_dmg()
     
     print("\nBuild process completed successfully!")
 
