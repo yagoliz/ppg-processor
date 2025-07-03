@@ -19,7 +19,7 @@ def calculate_ppi(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def clean_ppi_data(df: pd.DataFrame, low: float = 667, high: float = 2000) -> pd.DataFrame:
+def clean_ppi_data(df: pd.DataFrame, low: int = 667, high: int = 2000) -> pd.DataFrame:
     """
     Clean PPI data by removing rows with PPI values outside the valid range (667ms-2000ms)
     
@@ -33,7 +33,7 @@ def clean_ppi_data(df: pd.DataFrame, low: float = 667, high: float = 2000) -> pd
     """
 
     # Drop rows where PPI is outside the valid range
-    cleaned = df[(df['PPI'] >= 667) & (df['PPI'] <= 2000)]
+    cleaned = df[(df['PPI'] >= low) & (df['PPI'] <= high)]
     print(f"Cleaned PPI data: Removed {len(df) - len(cleaned)} rows outside the range {low}ms-{high}ms.")
 
     return cleaned
