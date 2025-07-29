@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ppg_processor"
-version = "1.0.3"
+version = "1.0.4"
 description = "A tool for processing PPG data and calculating PPI and HRV metrics"
 readme = "README.md"
 authors = [
