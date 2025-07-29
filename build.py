@@ -85,7 +85,7 @@ def build_executable():
         shutil.rmtree('dist')
 
     # Set icon path
-    icon_path = os.path.abspath('ppg_processor/assets/icon-512-maskable.png')
+    icon_path = os.path.abspath('ppg_processor/assets/icon.iconset/icon_512x512.png')
 
     # MacOS specific options
     onefile_option = '--onefile'  # Default to onefile for all platforms
@@ -177,14 +177,14 @@ def create_dmg():
     try:
         subprocess.run(["create-dmg",
                         "--volname", "PPG Processor",
-                        "--volicon", "ppg_processor/assets/icon-512-maskable.icns",
+                        "--volicon", "ppg_processor/assets/icon.iconset/icon_512x512.png",
                         "--window-pos", "200", "120",
                         "--window-size", "800", "400",
                         "--icon-size", "100",
                         "--icon", "PPG_Processor.app", "200", "190",
                         "--hide-extension", "PPG_Processor.app",
                         "--app-drop-link", "600", "185",
-                        "PPG_Processor-Installer.dmg",
+                        "PPG_Processor_Macos.dmg",
                         "dist/PPG_Processor.app"],
                         check=True)
 
