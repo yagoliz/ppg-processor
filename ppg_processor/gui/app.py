@@ -273,7 +273,7 @@ class PPGProcessorApp(QMainWindow):
         time_range_layout.addWidget(QLabel("Start Time:"), 1, 0)
         self.start_time_edit = QTimeEdit()
         self.start_time_edit.setDisplayFormat("HH:mm")
-        self.start_time_edit.setTime(QTime(0, 0))  # Default 00:00
+        self.start_time_edit.setTime(QTime(22, 0))  # Default 22:00
         self.start_time_edit.setEnabled(False)
         time_range_layout.addWidget(self.start_time_edit, 1, 1)
 

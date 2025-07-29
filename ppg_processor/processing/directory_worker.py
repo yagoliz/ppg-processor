@@ -65,8 +65,9 @@ class DirectoryProcessingWorker(QThread):
 
     def _process_directory(self):
         """Process all PPG files in the participant directory"""
-        # Find all folders in the directory
-        subfolders = [f.path for f in os.scandir(self.directory_path) if f.is_dir()]
+
+        # Find all folders in the directory with numeric names
+        subfolders = [f.path for f in os.scandir(self.directory_path) if f.is_dir() and f.name.isdigit()]
 
         if not subfolders:
             self.error.emit(f"No subfolders found in {self.directory_path}")
@@ -83,6 +84,7 @@ class DirectoryProcessingWorker(QThread):
             }
 
         # Process each folder
+        subfolders.sort()  # Sort folders for consistent processing
         for i, folder in enumerate(subfolders):
             # Update progress
             progress_pct = int((i / len(subfolders)) * 100)
@@ -104,15 +106,32 @@ class DirectoryProcessingWorker(QThread):
                 # Set datetime as index if it's not already
                 if "datetime" in ppg.columns and not isinstance(ppg.index, pd.DatetimeIndex):
                     ppg.set_index("datetime", inplace=True)
+                
+                # Assert that the index is a datetime index
+                if not isinstance(ppg.index, pd.DatetimeIndex):
+                    self.error.emit("PPG data must have a datetime index.")
+                    return
 
-                    # If time range is enabled, filter the data
+                # If time range is enabled, filter the data
                 if self.use_time_range and self.start_time and self.end_time:
                     # Convert string times to datetime.time objects
-                    start_time = datetime.datetime.strptime(self.start_time, "%H:%M").time()
-                    end_time = datetime.datetime.strptime(self.end_time, "%H:%M").time()
+                    start_time = datetime.datetime.strptime(self.start_time, "%H:%M")
+                    end_time = datetime.datetime.strptime(self.end_time, "%H:%M")
+
+                    # Here we need to a trick because we assume that the days start at 12:00 PM so that we can get night time HRV
+                    delta_time = datetime.timedelta(hours=12)
+                    start_time = (start_time + delta_time).time()
+                    end_time = (end_time + delta_time).time()
+
+                    if start_time > end_time:
+                        self.error.emit("Start time must be before end time. Note that times are adjusted by 12 hours to allow night time HRV.")
+                        return
 
                     # Filter based on time of day
-                    ppg = ppg[(ppg.index.time >= start_time) & (ppg.index.time <= end_time)]
+                    ppg.index = ppg.index + delta_time  # Adjust index to match the time range
+                    ppg = ppg[
+                        (ppg.index.time >= start_time) & (ppg.index.time <= end_time)
+                    ]
 
                     # If PPG is empty after filtering, emit status
                     if ppg.empty:
@@ -172,6 +191,10 @@ class DirectoryProcessingWorker(QThread):
 
                     # Sort by time
                     data_sample = data_sample.sort_values(by="Time")
+                    
+                    # Revert the delta time adjustment
+                    if self.use_time_range:
+                        data_sample["Time"] = data_sample["Time"] - delta_time
 
                     # Calculate PPI values
                     data_sample["PPI"] = data_sample["Time"].diff().dt.total_seconds() * 1000  # ms
@@ -198,6 +221,9 @@ class DirectoryProcessingWorker(QThread):
 
             except Exception as e:
                 self.status.emit(f"Error processing {folder}: {str(e)}")
+
+        # Fill progress bar
+        self.progress.emit(100)
 
         # Calculate HRV metrics on combined data
         if self.calculate_hrv:

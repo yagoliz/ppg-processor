@@ -57,13 +57,28 @@ class PPGProcessingWorker(QThread):
             if 'datetime' in ppg.columns:
                 ppg.set_index('datetime', inplace=True)
 
+            # Assert that the index is a datetime index
+            if not isinstance(ppg.index, pd.DatetimeIndex):
+                self.error.emit("PPG data must have a datetime index.")
+                return
+
             # If time range is enabled, filter the data
             if self.use_time_range and self.start_time and self.end_time:
                 # Convert string times to datetime.time objects
-                start_time = datetime.datetime.strptime(self.start_time, "%H:%M").time()
-                end_time = datetime.datetime.strptime(self.end_time, "%H:%M").time()
+                start_time = datetime.datetime.strptime(self.start_time, "%H:%M")
+                end_time = datetime.datetime.strptime(self.end_time, "%H:%M")
+
+                # Here we need to a trick because we assume that the days start at 12:00 PM so that we can get night time HRV
+                delta_time = datetime.timedelta(hours=12)
+                start_time = (start_time + delta_time).time()
+                end_time = (end_time + delta_time).time()
+
+                if start_time > end_time:
+                    self.error.emit("Start time must be before end time. Note that times are adjusted by 12 hours to allow night time HRV.")
+                    return
 
                 # Filter based on time of day
+                ppg.index = ppg.index + delta_time  # Adjust index to match the time range
                 ppg = ppg[
                     (ppg.index.time >= start_time) & (ppg.index.time <= end_time)
                 ]
@@ -132,8 +147,8 @@ class PPGProcessingWorker(QThread):
                 total_windows = len(list(ppg.groupby(pd.Grouper(freq=f"{self.window_size}min"))))
                 
                 for j, sample in enumerate(ppg.groupby(pd.Grouper(freq=f"{self.window_size}min"))):
-                    try:
-                        current_time = sample[0]
+                    current_time = sample[0]
+                    try:     
                         data = sample[1]
                         
                         if data.empty:
@@ -164,20 +179,22 @@ class PPGProcessingWorker(QThread):
                 
                 # Calculate PPI values
                 if not hrv_results.empty:
-                    # Rename datetime column to Time for consistency with provided functions
                     if isinstance(hrv_results.index, pd.DatetimeIndex):
-                        # Convert index to column
                         hrv_results = hrv_results.reset_index()
                         hrv_results.rename(columns={'index': 'Time'}, inplace=True)
+
                     elif 'datetime' in hrv_results.columns:
                         hrv_results.rename(columns={'datetime': 'Time'}, inplace=True)
+
                     elif 'timestamp' in hrv_results.columns:
                         hrv_results.rename(columns={'timestamp': 'Time'}, inplace=True)
                     
-                    # Sort by time
                     hrv_results = hrv_results.sort_values(by='Time')
-                    
-                    # Calculate PPI values
+
+                    # If time range was enabled, we need to revert back the time delta
+                    if self.use_time_range:
+                        hrv_results['Time'] = hrv_results['Time'] - delta_time
+
                     hrv_results['PPI'] = hrv_results['Time'].diff().dt.total_seconds() * 1000  # ms
                 
                 # Clean PPI data - remove outliers
@@ -224,6 +241,7 @@ class PPGProcessingWorker(QThread):
                     'overall_metrics': overall_metrics
                 }
                 
+            self.progress.emit(100)  # Complete progress
             self.finished_with_result.emit(results)
             
         except Exception as e:
